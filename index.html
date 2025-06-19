@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Digit Classifier with Grad-CAM</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 40px;
+    }
+    img {
+      margin-top: 20px;
+      border: 2px solid #333;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧠 Digit Classifier with Grad-CAM</h1>
+
+  <input type="file" id="fileInput" accept="image/*">
+  <button onclick="uploadImage()">Predict</button>
+
+  <h2 id="result"></h2>
+  <img id="heatmap" width="200" alt="Grad-CAM heatmap will appear here" />
+
+  <script>
+    async function uploadImage() {
+      const fileInput = document.getElementById('fileInput');
+      const result = document.getElementById('result');
+      const heatmap = document.getElementById('heatmap');
+
+      if (!fileInput.files[0]) {
+        alert("Please select an image!");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", fileInput.files[0]);
+
+      result.textContent = "Predicting...";
+
+      try {
+        const response = await fetch("http://127.0.0.1:8000/predict", {
+          method: "POST",
+          body: formData
+        });
+
+        const data = await response.json();
+        result.textContent = `Predicted Digit: ${data.prediction}`;
+
+        heatmap.src = `data:image/png;base64,${data.heatmap}`;
+      } catch (err) {
+        result.textContent = "Prediction failed.";
+        console.error(err);
+      }
+    }
+  </script>
+</body>
+</html>
