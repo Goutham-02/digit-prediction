@@ -1,4 +1,4 @@
-# utils.py
+
 from PIL import Image
 import torchvision.transforms as transforms
 
@@ -15,4 +15,3 @@ def process_image(image_file):
     tensor = tensor.unsqueeze(0) 
     tensor = 1 - tensor
     return tensor
-

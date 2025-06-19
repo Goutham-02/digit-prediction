@@ -2,43 +2,374 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Digit Classifier with Grad-CAM</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      padding: 40px;
+    :root {
+      --primary: #4361ee;
+      --primary-light: #e0e7ff;
+      --dark: #1e293b;
+      --light: #f8fafc;
+      --gray: #94a3b8;
+      --success: #10b981;
+      --error: #ef4444;
     }
-    img {
-      margin-top: 20px;
-      border: 2px solid #333;
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f1f5f9;
+      color: var(--dark);
+      line-height: 1.6;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      overflow: hidden;
+    }
+
+    header {
+      background: linear-gradient(135deg, var(--primary) 0%, #3a0ca3 100%);
+      color: white;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .subtitle {
+      font-size: 1rem;
+      font-weight: 400;
+      opacity: 0.9;
+    }
+
+    .content {
+      padding: 2rem;
+    }
+
+    .upload-area {
+      border: 2px dashed var(--gray);
+      border-radius: 8px;
+      padding: 2rem;
+      text-align: center;
+      margin-bottom: 2rem;
+      transition: all 0.3s ease;
+      background-color: var(--light);
+    }
+
+    .upload-area:hover {
+      border-color: var(--primary);
+      background-color: var(--primary-light);
+    }
+
+    .upload-area.active {
+      border-color: var(--primary);
+      background-color: var(--primary-light);
+    }
+
+    .file-input {
+      display: none;
+    }
+
+    .upload-btn {
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    .upload-btn:hover {
+      background-color: #3a56e8;
+      transform: translateY(-2px);
+    }
+
+    .upload-btn:active {
+      transform: translateY(0);
+    }
+
+    .file-name {
+      margin-top: 1rem;
+      font-size: 0.9rem;
+      color: var(--gray);
+    }
+
+    .results {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+      margin-top: 2rem;
+    }
+
+    @media (min-width: 768px) {
+      .results {
+        flex-direction: row;
+      }
+    }
+
+    .prediction-card, .heatmap-card {
+      flex: 1;
+      background: white;
+      border-radius: 8px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      border: 1px solid #e2e8f0;
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .prediction-value {
+      font-size: 3rem;
+      font-weight: 700;
+      color: var(--dark);
+      margin: 1rem 0;
+    }
+
+    .heatmap-img {
+      width: 100%;
+      max-width: 300px;
+      height: auto;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+      margin: 0 auto;
+      display: block;
+    }
+
+    .placeholder {
+      color: var(--gray);
+      font-style: italic;
+      text-align: center;
+      padding: 2rem 0;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 1s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .status {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      border-radius: 6px;
+      font-weight: 500;
+      text-align: center;
+    }
+
+    .status.success {
+      background-color: #d1fae5;
+      color: var(--success);
+    }
+
+    .status.error {
+      background-color: #fee2e2;
+      color: var(--error);
+    }
+
+    .status.loading {
+      background-color: #e0e7ff;
+      color: var(--primary);
     }
   </style>
 </head>
 <body>
-  <h1>🧠 Digit Classifier with Grad-CAM</h1>
+  <div class="container">
+    <header>
+      <h1>
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5"></path>
+          <path d="M8.5 8.5v.01"></path>
+          <path d="M16 15.5v.01"></path>
+          <path d="M12 12v.01"></path>
+          <path d="M11 17v.01"></path>
+          <path d="M7 14v.01"></path>
+        </svg>
+        Digit Classifier with Grad-CAM
+      </h1>
+      <p class="subtitle">Upload an image of a digit to see the model's prediction and attention heatmap</p>
+    </header>
 
-  <input type="file" id="fileInput" accept="image/*">
-  <button onclick="uploadImage()">Predict</button>
+    <div class="content">
+      <div class="upload-area" id="uploadArea">
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="17 8 12 3 7 8"></polyline>
+          <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+        <h3>Drag & drop an image here</h3>
+        <p>or</p>
+        <input type="file" id="fileInput" accept="image/*" class="file-input">
+        <label for="fileInput" class="upload-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+          Select Image
+        </label>
+        <div class="file-name" id="fileName">No file selected</div>
+      </div>
 
-  <h2 id="result"></h2>
-  <img id="heatmap" width="200" alt="Grad-CAM heatmap will appear here" />
+      <button id="predictBtn" class="upload-btn" style="width: 100%; justify-content: center;" disabled>
+        Predict Digit
+      </button>
+
+      <div id="status" class="status" style="display: none;"></div>
+
+      <div class="results">
+        <div class="prediction-card">
+          <div class="card-title">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            Prediction
+          </div>
+          <div id="predictionValue" class="prediction-value">-</div>
+          <div id="confidence" style="color: var(--gray);"></div>
+        </div>
+
+        <div class="heatmap-card">
+          <div class="card-title">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <path d="M14 2v6h6"></path>
+              <path d="M16 13H8"></path>
+              <path d="M16 17H8"></path>
+              <path d="M10 9H8"></path>
+            </svg>
+            Grad-CAM Heatmap
+          </div>
+          <img id="heatmap" class="heatmap-img" alt="Heatmap will appear here" />
+          <div id="heatmapPlaceholder" class="placeholder">Heatmap visualization will appear here</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script>
-    async function uploadImage() {
-      const fileInput = document.getElementById('fileInput');
-      const result = document.getElementById('result');
-      const heatmap = document.getElementById('heatmap');
+    // DOM elements
+    const fileInput = document.getElementById('fileInput');
+    const uploadArea = document.getElementById('uploadArea');
+    const predictBtn = document.getElementById('predictBtn');
+    const fileName = document.getElementById('fileName');
+    const predictionValue = document.getElementById('predictionValue');
+    const confidence = document.getElementById('confidence');
+    const heatmap = document.getElementById('heatmap');
+    const heatmapPlaceholder = document.getElementById('heatmapPlaceholder');
+    const statusDiv = document.getElementById('status');
 
+    // Drag and drop functionality
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      uploadArea.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      uploadArea.addEventListener(eventName, highlight, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      uploadArea.addEventListener(eventName, unhighlight, false);
+    });
+
+    function highlight() {
+      uploadArea.classList.add('active');
+    }
+
+    function unhighlight() {
+      uploadArea.classList.remove('active');
+    }
+
+    uploadArea.addEventListener('drop', handleDrop, false);
+
+    function handleDrop(e) {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      if (files.length) {
+        fileInput.files = files;
+        updateFileName();
+      }
+    }
+
+    // File input change
+    fileInput.addEventListener('change', updateFileName);
+
+    function updateFileName() {
+      if (fileInput.files.length) {
+        fileName.textContent = fileInput.files[0].name;
+        predictBtn.disabled = false;
+      } else {
+        fileName.textContent = 'No file selected';
+        predictBtn.disabled = true;
+      }
+    }
+
+    // Predict button click
+    predictBtn.addEventListener('click', uploadImage);
+
+    async function uploadImage() {
       if (!fileInput.files[0]) {
-        alert("Please select an image!");
+        showStatus('Please select an image first!', 'error');
         return;
       }
 
+      // Show loading state
+      predictBtn.innerHTML = `<span class="loading"></span> Predicting...`;
+      predictBtn.disabled = true;
+      showStatus('Processing image and making prediction...', 'loading');
+
       const formData = new FormData();
       formData.append("file", fileInput.files[0]);
-
-      result.textContent = "Predicting...";
 
       try {
         const response = await fetch("http://127.0.0.1:8000/predict", {
@@ -46,13 +377,42 @@
           body: formData
         });
 
-        const data = await response.json();
-        result.textContent = `Predicted Digit: ${data.prediction}`;
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-        heatmap.src = `data:image/png;base64,${data.heatmap}`;
+        const data = await response.json();
+        
+        // Update UI with results
+        predictionValue.textContent = data.prediction;
+        confidence.textContent = `Confidence: ${(data.confidence * 100).toFixed(1)}%`;
+        
+        if (data.heatmap) {
+          heatmap.src = `data:image/png;base64,${data.heatmap}`;
+          heatmap.style.display = 'block';
+          heatmapPlaceholder.style.display = 'none';
+        }
+        
+        showStatus('Prediction successful!', 'success');
       } catch (err) {
-        result.textContent = "Prediction failed.";
-        console.error(err);
+        console.error('Prediction error:', err);
+        showStatus('Prediction failed. Please try again.', 'error');
+      } finally {
+        predictBtn.textContent = 'Predict Digit';
+        predictBtn.disabled = false;
+      }
+    }
+
+    function showStatus(message, type) {
+      statusDiv.textContent = message;
+      statusDiv.className = `status ${type}`;
+      statusDiv.style.display = 'block';
+      
+      // Hide status after 5 seconds
+      if (type !== 'loading') {
+        setTimeout(() => {
+          statusDiv.style.display = 'none';
+        }, 5000);
       }
     }
   </script>
